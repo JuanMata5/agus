@@ -6,16 +6,16 @@ import clientPromise from "./lib/db.js";
 
 const app = express();
 
-app.use(express.json());
-
 const PORT = process.env.PORT || 3000;
+
+app.use(express.json());
 
 // favicon
 app.get("/favicon.ico", (req, res) => {
   res.status(204).end();
 });
 
-// HOME + guardar IP + redirect
+// HOME
 app.get("/", async (req, res) => {
   try {
     const client = await clientPromise;
@@ -43,13 +43,8 @@ app.get("/", async (req, res) => {
     console.error(err);
   }
 
-  // redirect
+  // REDIRECT
   res.redirect("https://google.com");
-});
-
-// API
-app.get("/api/ip", async (req, res) => {
-  res.json({ ok: true });
 });
 
 app.listen(PORT, () => {

@@ -1,16 +1,8 @@
-
 import dotenv from "dotenv";
 dotenv.config();
 
 import express from "express";
-import path from "path";
-import { fileURLToPath } from "url";
-import { readFileSync } from "fs";
-
-import ipHandler from "./api/ip.js";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+import clientPromise from "./lib/db.js";
 
 const app = express();
 
@@ -23,22 +15,42 @@ app.get("/favicon.ico", (req, res) => {
   res.status(204).end();
 });
 
-// home
-app.get("/", (req, res) => {
+// HOME + guardar IP + redirect
+app.get("/", async (req, res) => {
   try {
-    const html = readFileSync(
-      path.join(__dirname, "index.html"),
-      "utf-8"
-    );
+    const client = await clientPromise;
+    const db = client.db("ipdb");
 
-    res.send(html);
-  } catch {
-    res.send("Servidor funcionando ✔");
+    let ip =
+      req.headers["x-forwarded-for"] ||
+      req.ip ||
+      req.socket?.remoteAddress;
+
+    if (ip?.includes(",")) {
+      ip = ip.split(",")[0].trim();
+    }
+
+    const country =
+      req.headers["x-vercel-ip-country"] || "unknown";
+
+    await db.collection("ips").insertOne({
+      ip,
+      country,
+      date: new Date(),
+    });
+
+  } catch (err) {
+    console.error(err);
   }
+
+  // redirect
+  res.redirect("https://google.com");
 });
 
 // API
-app.get("/api/ip", ipHandler);
+app.get("/api/ip", async (req, res) => {
+  res.json({ ok: true });
+});
 
 app.listen(PORT, () => {
   console.log(`Servidor en puerto ${PORT}`);

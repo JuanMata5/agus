@@ -1,5 +1,3 @@
-import express from "express";
-import ipHandler from "./api/ip.js";
 import path from "path";
 import { fileURLToPath } from "url";
 import { readFileSync } from "fs";
@@ -11,14 +9,13 @@ const __dirname = path.dirname(__filename);
 export default function handler(req, res) {
   // Ruta específica para favicon.ico
   if (req.url === "/favicon.ico") {
-    return res.status(204).end();
+    return res.status(204).send("");
   }
 
   // Servir index.html
   if (req.url === "/" || req.url === undefined) {
     try {
       const html = readFileSync(path.join(__dirname, "index.html"), "utf-8");
-      res.setHeader("Content-Type", "text/html");
       return res.status(200).send(html);
     } catch (e) {
       return res.status(200).send("API funcionando ✔");
@@ -26,7 +23,7 @@ export default function handler(req, res) {
   }
 
   // Para otras rutas, devolver mensaje por defecto
-  res.status(200).json({ 
+  return res.status(200).json({ 
     message: "API funcionando", 
     endpoints: ["/api/ip"] 
   });

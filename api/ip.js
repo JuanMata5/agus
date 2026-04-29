@@ -1,4 +1,4 @@
-import clientPromise from "../lib/db";
+import clientPromise from "../lib/db.js";
 
 export default async function ipHandler(req, res) {
   try {

@@ -1,7 +1,6 @@
 {
   "buildCommand": "npm install",
   "installCommand": "npm install",
-  "rewrites": [
-    { "source": "/favicon.ico", "destination": "/api/favicon" }
-  ]
+  "framework": null,
+  "outputDirectory": "."
 }

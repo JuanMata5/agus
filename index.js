@@ -1,30 +1,45 @@
+
+import dotenv from "dotenv";
+dotenv.config();
+
+import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
 import { readFileSync } from "fs";
 
+import ipHandler from "./api/ip.js";
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Vercel Serverless Function
-export default function handler(req, res) {
-  // Ruta específica para favicon.ico
-  if (req.url === "/favicon.ico") {
-    return res.status(204).send("");
-  }
+const app = express();
 
-  // Servir index.html
-  if (req.url === "/" || req.url === undefined) {
-    try {
-      const html = readFileSync(path.join(__dirname, "index.html"), "utf-8");
-      return res.status(200).send(html);
-    } catch (e) {
-      return res.status(200).send("API funcionando ✔");
-    }
-  }
+app.use(express.json());
 
-  // Para otras rutas, devolver mensaje por defecto
-  return res.status(200).json({ 
-    message: "API funcionando", 
-    endpoints: ["/api/ip"] 
-  });
-}
+const PORT = process.env.PORT || 3000;
+
+// favicon
+app.get("/favicon.ico", (req, res) => {
+  res.status(204).end();
+});
+
+// home
+app.get("/", (req, res) => {
+  try {
+    const html = readFileSync(
+      path.join(__dirname, "index.html"),
+      "utf-8"
+    );
+
+    res.send(html);
+  } catch {
+    res.send("Servidor funcionando ✔");
+  }
+});
+
+// API
+app.get("/api/ip", ipHandler);
+
+app.listen(PORT, () => {
+  console.log(`Servidor en puerto ${PORT}`);
+});

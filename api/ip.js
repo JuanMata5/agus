@@ -1,19 +1,18 @@
 import clientPromise from "../lib/db";
 
-export default async function handler(req, res) {
+export default async function ipHandler(req, res) {
   try {
     const client = await clientPromise;
     const db = client.db("ipdb");
 
-    let ip =
-      req.headers["x-forwarded-for"] || req.socket?.remoteAddress;
+    // Express usa req.ip, Vercel usa headers
+    let ip = req.headers["x-forwarded-for"] || req.ip || req.socket?.remoteAddress;
 
     if (ip && ip.includes(",")) {
       ip = ip.split(",")[0].trim();
     }
 
-    const country =
-      req.headers["x-vercel-ip-country"] || "unknown";
+    const country = req.headers["x-vercel-ip-country"] || "unknown";
 
     const data = {
       ip,

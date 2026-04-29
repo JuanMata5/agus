@@ -13,10 +13,32 @@ export default async function handler(req, res) {
       ip = ip.split(",")[0].trim();
     }
 
-    await db.collection("ips").insertOne({
+    // localhost fix
+    if (ip === "::1") {
+      ip = "8.8.8.8";
+    }
+
+    // GEO API
+    const geoRes = await fetch(
+      `https://ipapi.co/${ip}/json/`
+    );
+
+    const geo = await geoRes.json();
+
+    const data = {
       ip,
+      city: geo.city,
+      region: geo.region,
+      country: geo.country_name,
+      latitude: geo.latitude,
+      longitude: geo.longitude,
+      timezone: geo.timezone,
+      org: geo.org,
+      userAgent: req.headers["user-agent"],
       date: new Date(),
-    });
+    };
+
+    await db.collection("ips").insertOne(data);
 
     res.statusCode = 302;
 

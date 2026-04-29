@@ -1,4 +1,9 @@
-export default function handler(req, res) {
+import clientPromise from "../lib/db";
+
+export default async function handler(req, res) {
+  const client = await clientPromise;
+  const db = client.db("ipdb");
+
   let ip =
     req.headers["x-forwarded-for"] || req.socket.remoteAddress;
 
@@ -6,5 +11,19 @@ export default function handler(req, res) {
     ip = ip.split(",")[0].trim();
   }
 
-  res.status(200).send(`Tu IP es: ${ip}`);
+  const country =
+    req.headers["x-vercel-ip-country"] || "unknown";
+
+  const data = {
+    ip,
+    country,
+    date: new Date(),
+  };
+
+  await db.collection("ips").insertOne(data);
+
+  res.status(200).json({
+    ok: true,
+    saved: data
+  });
 }

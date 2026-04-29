@@ -13,23 +13,25 @@ export default async function handler(req, res) {
       ip = ip.split(",")[0].trim();
     }
 
-    const country =
-      req.headers["x-vercel-ip-country"] || "unknown";
-
     await db.collection("ips").insertOne({
       ip,
-      country,
       date: new Date(),
     });
 
-    return res.redirect("https://google.com");
+    res.statusCode = 302;
+
+    res.setHeader(
+      "Location",
+      "https://google.com"
+    );
+
+    return res.end();
 
   } catch (err) {
     console.error(err);
 
     return res.status(500).json({
-      ok: false,
-      error: err.message,
+      error: err.message
     });
   }
 }

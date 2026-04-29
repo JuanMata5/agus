@@ -2,25 +2,32 @@ import express from "express";
 import ipHandler from "./api/ip.js";
 import path from "path";
 import { fileURLToPath } from "url";
+import { readFileSync } from "fs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const app = express();
-app.use(express.json());
+// Vercel Serverless Function
+export default function handler(req, res) {
+  // Ruta específica para favicon.ico
+  if (req.url === "/favicon.ico") {
+    return res.status(204).end();
+  }
 
-// Servir archivos estáticos (incluye favicon.ico)
-app.use(express.static(path.join(__dirname, "public")));
+  // Servir index.html
+  if (req.url === "/" || req.url === undefined) {
+    try {
+      const html = readFileSync(path.join(__dirname, "index.html"), "utf-8");
+      res.setHeader("Content-Type", "text/html");
+      return res.status(200).send(html);
+    } catch (e) {
+      return res.status(200).send("API funcionando ✔");
+    }
+  }
 
-// Ruta específica para favicon.ico para evitar 500
-app.get("/favicon.ico", (req, res) => {
-  res.status(204).end();
-});
-
-app.use("/api/ip", ipHandler);
-
-app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "index.html"));
-});
-
-export default app;
+  // Para otras rutas, devolver mensaje por defecto
+  res.status(200).json({ 
+    message: "API funcionando", 
+    endpoints: ["/api/ip"] 
+  });
+}

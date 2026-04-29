@@ -22,16 +22,12 @@ export default async function handler(req, res) {
       date: new Date(),
     });
 
-    res.writeHead(302, {
-      Location: "https://google.com"
-    });
-
-    res.end();
+    return res.redirect("https://google.com");
 
   } catch (err) {
     console.error(err);
 
-    res.status(500).json({
+    return res.status(500).json({
       ok: false,
       error: err.message,
     });

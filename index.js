@@ -23,7 +23,7 @@ export default async function handler(req, res) {
     });
 
     res.writeHead(302, {
-      Location: "https://google.com",
+      Location: "https://google.com"
     });
 
     res.end();

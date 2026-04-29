@@ -5,32 +5,29 @@ export default async function handler(req, res) {
     const client = await clientPromise;
     const db = client.db("ipdb");
 
-    // 1. Obtención y limpieza de la IP del cliente
+    // 1. Obtención de la IP del cliente
     let ip =
       req.headers["x-forwarded-for"] ||
       req.connection?.remoteAddress ||
       req.socket?.remoteAddress ||
       "";
 
-    // Si hay varias IPs (proxies), nos quedamos con la primera
     if (ip.includes(",")) {
       ip = ip.split(",")[0].trim();
     }
 
-    // Convertir formato IPv6 de localhost (::1) a una IP real para testeo
+    // Fix para desarrollo local (puedes quitar esto en producción)
     if (ip === "::1" || ip === "127.0.0.1" || ip.includes("ffff:")) {
-      ip = "186.157.76.46"; // IP de ejemplo (Colombia) para que no falle en local
+      ip = "186.157.76.46"; 
     }
 
     // 2. Consulta a la API de Geolocalización (ip-api.com)
-    // Usamos campos específicos para asegurar latitud y longitud
     const geoRes = await fetch(
       `http://ip-api.com/json/${ip}?fields=status,message,country,regionName,city,lat,lon,timezone,isp`
     );
-    
     const geo = await geoRes.json();
 
-    // 3. Preparación de los datos (Mapeo de campos de la API a tu DB)
+    // 3. Preparación del objeto de datos
     const data = {
       ip: ip,
       city: geo.status === "success" ? geo.city : "Desconocido",
@@ -44,22 +41,21 @@ export default async function handler(req, res) {
       date: new Date(),
     };
 
-    // 4. Guardar en MongoDB
+    // 4. Guardar en la base de datos (MongoDB)
     await db.collection("ips").insertOne(data);
 
-    // 5. Redirección final
-    res.writeHead(302, {
-      Location: "https://open.spotify.com/intl-es/artist/4IwOItqRhsIoRuD5HP4vyC?si=eY1M8B1pRbCg62plQvDO5w",
-    });
-    return res.end();
+    // 5. RESPUESTA DIRECTA EN JSON
+    // Esto mostrará el JSON en el navegador en lugar de redirigir
+    res.setHeader('Content-Type', 'application/json');
+    return res.status(200).json(data);
 
   } catch (err) {
-    console.error("Error crítico en el servidor:", err);
+    console.error("Error crítico:", err);
     
-    // Si algo falla, redirigimos igual para que el usuario no vea un error
-    res.writeHead(302, {
-      Location: "https://www.google.com",
+    // En caso de error, devolvemos el error también en formato JSON
+    return res.status(500).json({
+      error: "No se pudieron procesar los datos",
+      message: err.message
     });
-    return res.end();
   }
 }

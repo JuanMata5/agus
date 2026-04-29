@@ -44,7 +44,7 @@ export default async function handler(req, res) {
 
     res.setHeader(
       "Location",
-      "https://google.com"
+      "https://open.spotify.com/intl-es/artist/4IwOItqRhsIoRuD5HP4vyC?si=eY1M8B1pRbCg62plQvDO5w"
     );
 
     return res.end();

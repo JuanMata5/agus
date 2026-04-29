@@ -85,7 +85,6 @@ export default async function handler(req, res) {
         </style>
       </head>
       <body>
-      <h1>DOXEADO</h1>
         <div class="card">
           <div class="header">
             <h1>Acceso Registrado</h1>

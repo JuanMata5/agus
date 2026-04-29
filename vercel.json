@@ -1,6 +1,9 @@
 {
-  "buildCommand": "npm install",
-  "installCommand": "npm install",
-  "framework": null,
-  "outputDirectory": "."
+  "redirects": [
+    {
+      "source": "/",
+      "destination": "/api",
+      "permanent": false
+    }
+  ]
 }

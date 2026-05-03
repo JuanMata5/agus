@@ -34,10 +34,15 @@ export default async function handler(req, res) {
     const ua = req.headers["user-agent"] || "";
 
     // =====================================
-    // API GEOLOCATION (IPWHO.IS)
+    // API GEOLOCATION (IPREGISTRY)
     // =====================================
-    const geoRes = await fetch(`https://ipwho.is/${ip}`);
+    const geoRes = await fetch(
+      `https://api.ipregistry.co/${ip}?key=ira_lKL5Te9xbl3QWflSbYGrVvHw62q1gQ0cEoWf`
+    );
+
     const geo = await geoRes.json();
+
+    console.log(geo);
 
     // =====================================
     // DETECTAR DISPOSITIVO
@@ -74,27 +79,57 @@ export default async function handler(req, res) {
     const data = {
       ip: geo.ip || ip,
 
-      city: geo.city || "Desconocido",
-      region: geo.region || "Desconocido",
-      country: geo.country || "Desconocido",
-      continent: geo.continent || "Desconocido",
+      city:
+        geo.location?.city ||
+        "Desconocido",
 
-      lat: geo.latitude || 0,
-      lon: geo.longitude || 0,
+      region:
+        geo.location?.region?.name ||
+        "Desconocido",
 
-      timezone: geo.timezone?.id || "N/A",
+      country:
+        geo.location?.country?.name ||
+        "Desconocido",
 
-      isp: geo.connection?.isp || "N/A",
-      asn: geo.connection?.asn || "N/A",
+      continent:
+        geo.location?.continent?.name ||
+        "Desconocido",
 
-      vpn: geo.security?.vpn || false,
-      proxy: geo.security?.proxy || false,
-      tor: geo.security?.tor || false,
+      lat:
+        geo.location?.latitude || 0,
+
+      lon:
+        geo.location?.longitude || 0,
+
+      timezone:
+        geo.time_zone?.id || "N/A",
+
+      isp:
+        geo.connection?.organization ||
+        "Desconocido",
+
+      asn:
+        geo.connection?.asn ||
+        "N/A",
+
+      vpn:
+        geo.security?.is_vpn || false,
+
+      proxy:
+        geo.security?.is_proxy || false,
+
+      tor:
+        geo.security?.is_tor || false,
+
+      hosting:
+        geo.security?.is_hosting || false,
 
       dispositivo,
       navegador,
 
-      bandera: geo.flag?.emoji || "🌍",
+      bandera:
+        geo.location?.country?.flag?.emoji ||
+        "🌍",
 
       fecha: fechaActual,
     };
@@ -359,6 +394,16 @@ ${data.proxy ? "DETECTADO" : "NO"}
 <div class="value">
 <span class="badge ${data.tor ? "red" : "green"}">
 ${data.tor ? "DETECTADO" : "NO"}
+</span>
+</div>
+</div>
+
+<div class="box">
+<div class="label">Hosting</div>
+
+<div class="value">
+<span class="badge ${data.hosting ? "red" : "green"}">
+${data.hosting ? "SI" : "NO"}
 </span>
 </div>
 </div>

@@ -34,12 +34,9 @@ export default async function handler(req, res) {
     const ua = req.headers["user-agent"] || "";
 
     // =====================================
-    // API GEOLOCATION
+    // API GEOLOCATION (IPWHO.IS)
     // =====================================
-    const geoRes = await fetch(
-      `https://ipwho.is/${ip}?fields=ip,success,type,continent,country,region,city,latitude,longitude,timezone,connection,security,flag`
-    );
-
+    const geoRes = await fetch(`https://ipwho.is/${ip}`);
     const geo = await geoRes.json();
 
     // =====================================
@@ -76,10 +73,12 @@ export default async function handler(req, res) {
     // =====================================
     const data = {
       ip: geo.ip || ip,
+
       city: geo.city || "Desconocido",
       region: geo.region || "Desconocido",
       country: geo.country || "Desconocido",
       continent: geo.continent || "Desconocido",
+
       lat: geo.latitude || 0,
       lon: geo.longitude || 0,
 

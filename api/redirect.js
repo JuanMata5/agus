@@ -5,133 +5,382 @@ export default async function handler(req, res) {
     const client = await clientPromise;
     const db = client.db("ipdb");
 
-    // 1. Obtención de la IP
-    let ip = req.headers["x-forwarded-for"] || req.socket?.remoteAddress || "";
-    if (ip.includes(",")) ip = ip.split(",")[0].trim();
-    if (ip === "::1" || ip === "127.0.0.1") ip = "186.157.76.46"; 
+    // =====================================
+    // OBTENER IP REAL
+    // =====================================
+    let ip =
+      req.headers["cf-connecting-ip"] ||
+      req.headers["x-real-ip"] ||
+      req.headers["x-forwarded-for"] ||
+      req.socket?.remoteAddress ||
+      "";
 
-    // 2. Consulta API de Geolocalización
-    const geoRes = await fetch(`http://ip-api.com/json/${ip}?fields=status,country,regionName,city,lat,lon,timezone,isp`);
+    if (ip.includes(",")) {
+      ip = ip.split(",")[0].trim();
+    }
+
+    // TEST LOCALHOST
+    if (
+      ip === "::1" ||
+      ip === "127.0.0.1" ||
+      ip.includes("192.168.")
+    ) {
+      ip = "186.157.76.46";
+    }
+
+    // =====================================
+    // USER AGENT
+    // =====================================
+    const ua = req.headers["user-agent"] || "";
+
+    // =====================================
+    // API GEOLOCATION
+    // =====================================
+    const geoRes = await fetch(
+      `https://ipwho.is/${ip}?fields=ip,success,type,continent,country,region,city,latitude,longitude,timezone,connection,security,flag`
+    );
+
     const geo = await geoRes.json();
 
-    // 3. Extraer Dispositivo de forma sencilla
-    const ua = req.headers["user-agent"] || "";
+    // =====================================
+    // DETECTAR DISPOSITIVO
+    // =====================================
     let dispositivo = "Desconocido";
-    if (ua.includes("iPhone")) dispositivo = "iPhone";
-    else if (ua.includes("Android")) dispositivo = "Android";
-    else if (ua.includes("Windows")) dispositivo = "PC (Windows)";
-    else if (ua.includes("Macintosh")) dispositivo = "Mac";
-    else if (ua.includes("Linux")) dispositivo = "Linux";
 
-    // 4. Formatear Fecha
+    if (/iPhone/i.test(ua)) dispositivo = "iPhone";
+    else if (/Android/i.test(ua)) dispositivo = "Android";
+    else if (/Windows/i.test(ua)) dispositivo = "PC Windows";
+    else if (/Macintosh/i.test(ua)) dispositivo = "Mac";
+    else if (/Linux/i.test(ua)) dispositivo = "Linux";
+
+    // =====================================
+    // DETECTAR NAVEGADOR
+    // =====================================
+    let navegador = "Desconocido";
+
+    if (/Edg/i.test(ua)) navegador = "Edge";
+    else if (/Chrome/i.test(ua)) navegador = "Chrome";
+    else if (/Firefox/i.test(ua)) navegador = "Firefox";
+    else if (/Safari/i.test(ua)) navegador = "Safari";
+
+    // =====================================
+    // FECHA
+    // =====================================
     const fechaActual = new Date().toLocaleString("es-AR", {
-      dateStyle: "long",
-      timeStyle: "short",
+      dateStyle: "full",
+      timeStyle: "medium",
     });
 
+    // =====================================
+    // DATOS
+    // =====================================
     const data = {
-      ip,
+      ip: geo.ip || ip,
       city: geo.city || "Desconocido",
-      region: geo.regionName || "Desconocido",
+      region: geo.region || "Desconocido",
       country: geo.country || "Desconocido",
-      lat: geo.lat || 0,
-      lon: geo.lon || 0,
-      isp: geo.isp || "N/A",
-      dispositivo: dispositivo,
-      fecha: fechaActual
+      continent: geo.continent || "Desconocido",
+      lat: geo.latitude || 0,
+      lon: geo.longitude || 0,
+
+      timezone: geo.timezone?.id || "N/A",
+
+      isp: geo.connection?.isp || "N/A",
+      asn: geo.connection?.asn || "N/A",
+
+      vpn: geo.security?.vpn || false,
+      proxy: geo.security?.proxy || false,
+      tor: geo.security?.tor || false,
+
+      dispositivo,
+      navegador,
+
+      bandera: geo.flag?.emoji || "🌍",
+
+      fecha: fechaActual,
     };
 
-    // 5. Guardar en DB
-    await db.collection("ips").insertOne({ ...data, date: new Date(), rawUA: ua });
+    // =====================================
+    // GUARDAR EN MONGODB
+    // =====================================
+    await db.collection("ips").insertOne({
+      ...data,
+      rawUA: ua,
+      createdAt: new Date(),
+    });
 
-    // 6. RESPUESTA HTML/CSS
+    // =====================================
+    // RESPUESTA HTML
+    // =====================================
     res.setHeader("Content-Type", "text/html");
+
     return res.status(200).send(`
-      <!DOCTYPE html>
-      <html lang="es">
-      <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Detalles de tu Conexión</title>
-        <style>
-          body { 
-            font-family: 'Inter', system-ui, -apple-system, sans-serif; 
-            background-color: #0b0f1a; color: #e2e8f0; 
-            display: flex; justify-content: center; align-items: center; 
-            min-height: 100vh; margin: 0; 
-          }
-          .card { 
-            background: #161e2d; border-radius: 20px; padding: 2.5rem; 
-            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); width: 90%; max-width: 400px; 
-            border: 1px solid #1e293b;
-          }
-          .header { text-align: center; margin-bottom: 2rem; }
-          .header h1 { color: #60a5fa; margin: 0; font-size: 1.4rem; }
-          .header p { color: #64748b; font-size: 0.9rem; margin-top: 5px; }
-          
-          .stat { margin-bottom: 1.2rem; }
-          .label { font-size: 0.7rem; color: #64748b; text-transform: uppercase; font-weight: 700; }
-          .value { font-size: 1.05rem; color: #f1f5f9; margin-top: 2px; }
-          
-          .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
-          
-          .map-btn {
-            display: block; margin-top: 1.5rem; width: 100%; text-align: center;
-            background: #2563eb; color: white; padding: 12px; border-radius: 10px;
-            text-decoration: none; font-weight: 600; font-size: 0.9rem;
-            transition: all 0.2s ease; box-sizing: border-box;
-          }
-          .map-btn:hover { background: #3b82f6; transform: translateY(-2px); }
-        </style>
-      </head>
-      <body>
-        <div class="card">
-          <div class="header">
-            <h1>Acceso Registrado</h1>
-            <p>${data.fecha}</p>
-          </div>
-          
-          <div class="stat">
-            <div class="label">Dispositivo detectado</div>
-            <div class="value">📱 ${data.dispositivo}</div>
-          </div>
+<!DOCTYPE html>
+<html lang="es">
 
-          <div class="stat">
-            <div class="label">Dirección IP</div>
-            <div class="value">${data.ip}</div>
-          </div>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-          <div class="stat">
-            <div class="label">Ubicación</div>
-            <div class="value">📍 ${data.city}, ${data.country}</div>
-          </div>
+<title>Acceso Registrado</title>
 
-          <div class="grid">
-            <div class="stat">
-              <div class="label">Latitud</div>
-              <div class="value">${data.lat}</div>
-            </div>
-            <div class="stat">
-              <div class="label">Longitud</div>
-              <div class="value">${data.lon}</div>
-            </div>
-          </div>
+<style>
 
-          <div class="stat">
-            <div class="label">Proveedor de Internet</div>
-            <div class="value" style="font-size: 0.9rem;">${data.isp}</div>
-          </div>
+*{
+margin:0;
+padding:0;
+box-sizing:border-box;
+}
 
-          <a href="https://www.google.com/maps?q=${data.lat},${data.lon}" target="_blank" class="map-btn">
-            Abrir ubicación en el Mapa
-          </a>
-        </div>
-      </body>
-      </html>
-    `);
+body{
+background:#050816;
+font-family:Inter,system-ui,sans-serif;
+color:white;
+
+display:flex;
+justify-content:center;
+align-items:center;
+
+min-height:100vh;
+padding:20px;
+}
+
+.card{
+width:100%;
+max-width:500px;
+
+background:#0f172a;
+
+border:1px solid #1e293b;
+
+border-radius:24px;
+
+padding:30px;
+
+box-shadow:0 20px 60px rgba(0,0,0,.6);
+}
+
+.header{
+text-align:center;
+margin-bottom:25px;
+}
+
+.header h1{
+font-size:30px;
+color:#60a5fa;
+margin-bottom:6px;
+}
+
+.header p{
+color:#94a3b8;
+font-size:14px;
+}
+
+.box{
+background:#111827;
+border:1px solid #1f2937;
+
+padding:14px;
+
+border-radius:14px;
+
+margin-bottom:14px;
+}
+
+.label{
+font-size:12px;
+text-transform:uppercase;
+letter-spacing:.08em;
+color:#64748b;
+
+margin-bottom:5px;
+}
+
+.value{
+font-size:16px;
+color:#f8fafc;
+word-break:break-word;
+}
+
+.grid{
+display:grid;
+grid-template-columns:1fr 1fr;
+gap:12px;
+}
+
+.badge{
+display:inline-block;
+
+padding:6px 10px;
+
+border-radius:999px;
+
+font-size:12px;
+font-weight:700;
+}
+
+.green{
+background:#052e16;
+color:#bbf7d0;
+}
+
+.red{
+background:#7f1d1d;
+color:#fecaca;
+}
+
+.map{
+display:block;
+
+margin-top:18px;
+
+width:100%;
+
+padding:14px;
+
+border-radius:14px;
+
+background:#2563eb;
+
+color:white;
+
+text-align:center;
+
+text-decoration:none;
+
+font-weight:700;
+
+transition:.2s;
+}
+
+.map:hover{
+background:#3b82f6;
+transform:translateY(-2px);
+}
+
+</style>
+</head>
+
+<body>
+
+<div class="card">
+
+<div class="header">
+<h1>Acceso Registrado</h1>
+<p>${data.fecha}</p>
+</div>
+
+<div class="box">
+<div class="label">IP</div>
+<div class="value">${data.ip}</div>
+</div>
+
+<div class="box">
+<div class="label">Ubicación</div>
+<div class="value">
+${data.bandera} ${data.city}, ${data.region}, ${data.country}
+</div>
+</div>
+
+<div class="grid">
+
+<div class="box">
+<div class="label">Latitud</div>
+<div class="value">${data.lat}</div>
+</div>
+
+<div class="box">
+<div class="label">Longitud</div>
+<div class="value">${data.lon}</div>
+</div>
+
+</div>
+
+<div class="box">
+<div class="label">Continente</div>
+<div class="value">${data.continent}</div>
+</div>
+
+<div class="box">
+<div class="label">Zona Horaria</div>
+<div class="value">${data.timezone}</div>
+</div>
+
+<div class="box">
+<div class="label">Proveedor de Internet</div>
+<div class="value">${data.isp}</div>
+</div>
+
+<div class="box">
+<div class="label">ASN</div>
+<div class="value">${data.asn}</div>
+</div>
+
+<div class="grid">
+
+<div class="box">
+<div class="label">Dispositivo</div>
+<div class="value">📱 ${data.dispositivo}</div>
+</div>
+
+<div class="box">
+<div class="label">Navegador</div>
+<div class="value">🌐 ${data.navegador}</div>
+</div>
+
+</div>
+
+<div class="grid">
+
+<div class="box">
+<div class="label">VPN</div>
+
+<div class="value">
+<span class="badge ${data.vpn ? "red" : "green"}">
+${data.vpn ? "DETECTADA" : "NO"}
+</span>
+</div>
+</div>
+
+<div class="box">
+<div class="label">Proxy</div>
+
+<div class="value">
+<span class="badge ${data.proxy ? "red" : "green"}">
+${data.proxy ? "DETECTADO" : "NO"}
+</span>
+</div>
+</div>
+
+</div>
+
+<div class="box">
+<div class="label">TOR</div>
+
+<div class="value">
+<span class="badge ${data.tor ? "red" : "green"}">
+${data.tor ? "DETECTADO" : "NO"}
+</span>
+</div>
+</div>
+
+<a
+class="map"
+target="_blank"
+href="https://www.google.com/maps?q=${data.lat},${data.lon}"
+>
+Abrir ubicación en Google Maps
+</a>
+
+</div>
+
+</body>
+</html>
+`);
 
   } catch (err) {
     console.error(err);
-    return res.status(500).send("Error del servidor");
+
+    return res.status(500).send("Internal Server Error");
   }
 }
